@@ -493,29 +493,13 @@ function parseNumbers(raw) {
     .filter((v, i, a) => a.indexOf(v) === i);
 }
 
-// toPair: "0761720020" -> "76-1720020" (PTS API-format)
 function toPair(num) {
-  // Mobilnummer 07x (10 siffror): NDC = 2 siffror utan ledande 0
-  if (/^07/.test(num) && num.length === 10) {
-    return num.slice(1, 3) + '-' + num.slice(3);
-  }
-  // 010-nummer (10 siffror)
-  if (num.startsWith('010') && num.length === 10) {
-    return '10-' + num.slice(3);
-  }
-  // Stockholm 08
-  if (num.startsWith('08')) {
-    return '8-' + num.slice(2);
-  }
-  // Fastnät 3-siffrigt riktnummer (011, 013, 016, 018, 019, 021, 023, 026, 031, 033, 035, 036, 040, 042, 044, 046, 054, 060, 063, 090)
+  if (/^07/.test(num) && num.length === 10) return num.slice(1,3) + '-' + num.slice(3);
+  if (num.startsWith('010') && num.length === 10) return '10-' + num.slice(3);
+  if (num.startsWith('08')) return '8-' + num.slice(2);
   const ndc3 = ['011','013','016','018','019','021','023','026','031','033','035','036','040','042','044','046','054','060','063','090','020'];
-  for (const p of ndc3) {
-    if (num.startsWith(p)) {
-      return p.slice(1) + '-' + num.slice(p.length);
-    }
-  }
-  // Generell fallback
-  return num.slice(1, 3) + '-' + num.slice(3);
+  for (const p of ndc3) { if (num.startsWith(p)) return p.slice(1) + '-' + num.slice(p.length); }
+  return num.slice(1,3) + '-' + num.slice(3);
 }
 
 function statusOf(op) {
@@ -531,43 +515,28 @@ function badge(op) {
   return '<span class="badge badge-other">Annan</span>';
 }
 
+// Hämtar via allorigins CORS-proxy (kringgår PTS saknade CORS-headers)
 async function lookupBatch(nums) {
   const pairs = nums.map(toPair);
-  // Prova data.pts.se (ny) och api.pts.se (gammal) som fallback
-  const urls = [
-    'https://data.pts.se/v1/operator/' + pairs.join(','),
-    'http://api.pts.se/PTSNumberService/Pts_Number_Service.svc/json/SearchByNumberList?' + pairs.map(p => 'number=' + p).join('&')
-  ];
+  const ptsUrl = 'https://data.pts.se/v1/operator/' + pairs.join(',');
+  const proxyUrl = 'https://api.allorigins.win/get?url=' + encodeURIComponent(ptsUrl);
 
-  let data = null;
-  for (const url of urls) {
-    try {
-      console.log('Försöker:', url);
-      const r = await fetch(url);
-      console.log('HTTP-svar:', r.status, r.ok);
-      if (!r.ok) { console.warn('Inte OK:', r.status); continue; }
-      data = await r.json();
-      console.log('API-svar:', JSON.stringify(data).slice(0, 300));
-      break;
-    } catch(e) {
-      console.warn('API-fel på', url, ':', e.message);
-    }
-  }
+  const r = await fetch(proxyUrl);
+  if (!r.ok) throw new Error('Proxy HTTP ' + r.status);
+  const wrapper = await r.json();
+  if (!wrapper.contents) throw new Error('Tom proxy-respons');
 
-  if (!data) throw new Error('Kunde inte nå PTS API');
-
+  const data = JSON.parse(wrapper.contents);
   const items = Array.isArray(data) ? data : [data];
+
   const map = {};
   for (const item of items) {
-    // data.pts.se returnerar {number, name}
-    // api.pts.se returnerar {Number, Name} eller liknande
-    const k = (item.number || item.Number || '').trim();
-    const op = (item.name || item.Name || item.OperatorName || '').trim();
-    if (k && op) map[k] = op;
-    // Normalisera: API kan returnera utan bindestreck t.ex. "761720020"
-    // Lägg även till utan bindestreck som nyckel
-    const kNoDash = k.replace('-', '');
-    if (kNoDash && op) map[kNoDash] = op;
+    const k  = (item.number || '').trim();
+    const op = (item.name   || '').trim();
+    if (k && op) {
+      map[k] = op;                       // t.ex. "76-1720020"
+      map[k.replace('-', '')] = op;      // t.ex. "761720020"
+    }
   }
   return map;
 }
@@ -586,7 +555,7 @@ async function doSearch() {
   document.getElementById('statusMsg').textContent = '';
   allResults = [];
 
-  const BATCH = 200;
+  const BATCH = 50;
   const batches = [];
   for (let i = 0; i < nums.length; i += BATCH) batches.push(nums.slice(i, i + BATCH));
 
@@ -598,14 +567,12 @@ async function doSearch() {
     try {
       const map = await lookupBatch(batches[bi]);
       for (const num of batches[bi]) {
-        const keyDash   = toPair(num);               // t.ex. "76-1720020"
-        const keyNoDash = num.slice(1);               // t.ex. "761720020"
-        const found = map[keyDash] || map[keyNoDash] || null;
+        const found = map[toPair(num)] || map[num.slice(1)] || null;
         if (found) resultMap[num] = found;
       }
     } catch(e) {
       console.error('Batch-fel:', e);
-      document.getElementById('statusMsg').textContent = 'API-fel: ' + e.message;
+      document.getElementById('statusMsg').textContent = 'Fel: ' + e.message;
     }
     if (bi < batches.length - 1) await new Promise(res => setTimeout(res, 300));
   }

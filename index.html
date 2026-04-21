@@ -444,7 +444,7 @@ tbody tr:nth-child(even):hover { background: var(--surface2); }
       </svg>
     </div>
     <div class="header-text">
-      <div class="pts-label">Post- och telestyrelsen &nbsp;·&nbsp; v2.4</div>
+      <div class="pts-label">Post- och telestyrelsen &nbsp;·&nbsp; v2.5</div>
       <h1>Operatörskontroll</h1>
       <p class="header-sub">Slå upp vilken operatör ett eller flera svenska telefonnummer tillhör — via PTS öppna API. Stöder massladdning upp till 200 nummer per sökning.</p>
     </div>
@@ -741,8 +741,7 @@ function switchCountry(c) {
 
 function parseFiNumbers(raw) {
   return raw
-    .split(/[
-,;]+/)
+    .split(/[\n,;]+/)
     .map(s => s.trim().replace(/[\s\-\(\)]/g, ''))
     .map(s => {
       if (s.startsWith('+358')) return '0' + s.slice(4);

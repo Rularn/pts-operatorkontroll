@@ -533,15 +533,41 @@ function badge(op) {
 
 async function lookupBatch(nums) {
   const pairs = nums.map(toPair);
-  const r = await fetch('https://data.pts.se/v1/operator/' + pairs.join(','));
-  if (!r.ok) throw new Error('HTTP ' + r.status);
-  const data = await r.json();
+  // Prova data.pts.se (ny) och api.pts.se (gammal) som fallback
+  const urls = [
+    'https://data.pts.se/v1/operator/' + pairs.join(','),
+    'http://api.pts.se/PTSNumberService/Pts_Number_Service.svc/json/SearchByNumberList?' + pairs.map(p => 'number=' + p).join('&')
+  ];
+
+  let data = null;
+  for (const url of urls) {
+    try {
+      console.log('Försöker:', url);
+      const r = await fetch(url);
+      console.log('HTTP-svar:', r.status, r.ok);
+      if (!r.ok) { console.warn('Inte OK:', r.status); continue; }
+      data = await r.json();
+      console.log('API-svar:', JSON.stringify(data).slice(0, 300));
+      break;
+    } catch(e) {
+      console.warn('API-fel på', url, ':', e.message);
+    }
+  }
+
+  if (!data) throw new Error('Kunde inte nå PTS API');
+
   const items = Array.isArray(data) ? data : [data];
   const map = {};
   for (const item of items) {
-    const k = (item.number || '').trim();
-    const op = (item.name || item.Name || '').trim();
+    // data.pts.se returnerar {number, name}
+    // api.pts.se returnerar {Number, Name} eller liknande
+    const k = (item.number || item.Number || '').trim();
+    const op = (item.name || item.Name || item.OperatorName || '').trim();
     if (k && op) map[k] = op;
+    // Normalisera: API kan returnera utan bindestreck t.ex. "761720020"
+    // Lägg även till utan bindestreck som nyckel
+    const kNoDash = k.replace('-', '');
+    if (kNoDash && op) map[kNoDash] = op;
   }
   return map;
 }
@@ -572,10 +598,15 @@ async function doSearch() {
     try {
       const map = await lookupBatch(batches[bi]);
       for (const num of batches[bi]) {
-        const key = toPair(num);
-        if (map[key]) resultMap[num] = map[key];
+        const keyDash   = toPair(num);               // t.ex. "76-1720020"
+        const keyNoDash = num.slice(1);               // t.ex. "761720020"
+        const found = map[keyDash] || map[keyNoDash] || null;
+        if (found) resultMap[num] = found;
       }
-    } catch(e) { console.error(e); }
+    } catch(e) {
+      console.error('Batch-fel:', e);
+      document.getElementById('statusMsg').textContent = 'API-fel: ' + e.message;
+    }
     if (bi < batches.length - 1) await new Promise(res => setTimeout(res, 300));
   }
 

@@ -444,7 +444,7 @@ tbody tr:nth-child(even):hover { background: var(--surface2); }
       </svg>
     </div>
     <div class="header-text">
-      <div class="pts-label">Post- och telestyrelsen &nbsp;·&nbsp; v2.8</div>
+      <div class="pts-label">Post- och telestyrelsen &nbsp;·&nbsp; v2.9</div>
       <h1>Operatörskontroll</h1>
       <p class="header-sub">Slå upp vilken operatör ett eller flera svenska telefonnummer tillhör — via PTS öppna API. Stöder massladdning upp till 200 nummer per sökning.</p>
     </div>
@@ -763,58 +763,52 @@ function getFiPrefix(num) {
   return null;
 }
 
-async function lookupFinnish() {
+function lookupFinnish() {
   const nums = parseFiNumbers(document.getElementById('fiInput').value);
   if (!nums.length) {
     document.getElementById('fiStatus').textContent = 'Inga giltiga finska nummer hittades.';
     return;
   }
-  document.getElementById('fiStatus').textContent = 'Söker…';
+
   const container = document.getElementById('fiResult');
   container.innerHTML = '';
 
-  const results = [];
-  for (const num of nums) {
-    const parts = getFiPrefix(num);
-    if (!parts) { results.push({ num, op: null }); continue; }
-    const [prefix, suffix] = parts;
-    const pair = prefix + '-' + suffix;
-    try {
-      const r = await fetch(PROXY_BASE + '?c=fi&n=' + encodeURIComponent(pair));
-      const data = await r.json();
-      const items = Array.isArray(data) ? data : [data];
-      const op = items[0] && items[0].name ? items[0].name.trim() : null;
-      results.push({ num, op });
-    } catch(e) {
-      results.push({ num, op: null });
-    }
-  }
-
+  // Bygg tabell med knappar som öppnar Numpac i ny flik via POST-formulär
   let html = '<div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:12px;">';
   html += '<table style="width:100%;border-collapse:collapse;">';
   html += '<thead style="background:var(--surface2);"><tr>';
   html += '<th style="padding:10px 16px;text-align:left;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#c8d4e0;border-bottom:1px solid var(--border);">Nummer</th>';
-  html += '<th style="padding:10px 16px;text-align:left;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#c8d4e0;border-bottom:1px solid var(--border);">Operatör</th>';
-  html += '<th style="padding:10px 16px;text-align:left;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#c8d4e0;border-bottom:1px solid var(--border);">Status</th>';
+  html += '<th style="padding:10px 16px;text-align:left;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#c8d4e0;border-bottom:1px solid var(--border);">Sök på Numpac</th>';
   html += '</tr></thead><tbody>';
-  results.forEach((row, i) => {
+
+  nums.forEach((num, i) => {
+    const parts = getFiPrefix(num);
     const bg = i % 2 === 0 ? 'var(--surface)' : 'rgba(22,27,36,0.6)';
-    const isLast = i === results.length - 1;
+    const isLast = i === nums.length - 1;
     const border = isLast ? 'none' : '1px solid var(--border)';
     html += '<tr style="background:' + bg + ';">';
-    html += '<td style="padding:10px 16px;font-family:var(--mono);font-size:13px;border-bottom:' + border + ';">' + row.num + '</td>';
-    html += '<td style="padding:10px 16px;font-size:13px;color:var(--text);border-bottom:' + border + ';">' + (row.op || '<span style="color:var(--faint)">—</span>') + '</td>';
-    if (row.op) {
-      html += '<td style="padding:10px 16px;border-bottom:' + border + ';"><span style="display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;padding:3px 10px;border-radius:99px;color:var(--telia);border:1px solid rgba(74,222,128,0.25);background:rgba(74,222,128,0.08);">● Hittad</span></td>';
+    html += '<td style="padding:10px 16px;font-family:var(--mono);font-size:13px;border-bottom:' + border + ';">' + num + '</td>';
+    if (parts) {
+      const [prefix, suffix] = parts;
+      // Skapa ett dolt POST-formulär per nummer
+      const formId = 'fi-form-' + i;
+      html += '<td style="padding:8px 16px;border-bottom:' + border + ';">';
+      html += '<form id="' + formId + '" method="POST" action="https://www.siirretytnumerot.fi/NumberQueryServlet" target="_blank" style="display:inline;">';
+      html += '<input type="hidden" name="clientLanguage" value="se">';
+      html += '<input type="hidden" name="numberPrefix" value="' + prefix + '">';
+      html += '<input type="hidden" name="numberSuffix" value="' + suffix + '">';
+      html += '<button type="submit" style="font-family:var(--mono);font-size:11px;padding:4px 12px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--accent2);cursor:pointer;letter-spacing:.04em;">🔍 Öppna Numpac →</button>';
+      html += '</form></td>';
     } else {
-      html += '<td style="padding:10px 16px;border-bottom:' + border + ';"><span style="display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;padding:3px 10px;border-radius:99px;color:var(--miss);border:1px solid rgba(251,191,36,0.25);background:rgba(251,191,36,0.08);">● Ingen träff</span></td>';
+      html += '<td style="padding:10px 16px;border-bottom:' + border + ';color:var(--faint);font-size:12px;">Okänt prefix</td>';
     }
     html += '</tr>';
   });
+
   html += '</tbody></table></div>';
+  html += '<p style="font-size:11px;color:var(--muted);line-height:1.6;">Klicka på knappen för varje nummer — Numpac öppnas i en ny flik med numret ifyllt och sökt automatiskt.</p>';
   container.innerHTML = html;
-  const found = results.filter(r => r.op).length;
-  document.getElementById('fiStatus').textContent = results.length + ' nummer sökta — ' + found + ' hittade.';
+  document.getElementById('fiStatus').textContent = nums.length + ' nummer listade.';
 }
 
 function clearAll() {

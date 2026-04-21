@@ -444,7 +444,7 @@ tbody tr:nth-child(even):hover { background: var(--surface2); }
       </svg>
     </div>
     <div class="header-text">
-      <div class="pts-label">Post- och telestyrelsen &nbsp;·&nbsp; v3.1</div>
+      <div class="pts-label">Post- och telestyrelsen &nbsp;·&nbsp; v3.2</div>
       <h1>Operatörskontroll</h1>
       <p class="header-sub">Slå upp vilken operatör ett eller flera svenska telefonnummer tillhör — via PTS öppna API. Stöder massladdning upp till 200 nummer per sökning.</p>
     </div>
@@ -791,10 +791,15 @@ function lookupFinnish() {
     if (parts) {
       const [prefix, suffix] = parts;
       // Öppna Numpac och auto-fyll formuläret via JavaScript
-      // Öppna vår mellansida numpac.html som POST:ar till Numpac
-      const numpacUrl = 'numpac.html?prefix=' + encodeURIComponent(prefix) + '&suffix=' + encodeURIComponent(suffix);
-      html += '<td style="padding:8px 16px;border-bottom:' + border + ';">';
-      html += '<a href="' + numpacUrl + '" target="_blank" style="font-family:var(--mono);font-size:11px;padding:4px 12px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--accent2);cursor:pointer;letter-spacing:.04em;text-decoration:none;display:inline-block;">🔍 Sök på Numpac →</a>';
+      // Visa prefix + suffix tydligt, länk till Numpac
+      const numpacBase = 'https://www.siirretytnumerot.fi/index.html?clientLanguage=se';
+      html += '<td style="padding:8px 16px;border-bottom:' + border + ';font-size:13px;">';
+      html += '<span style="font-family:var(--mono);color:var(--text);">';
+      html += '<span style="color:var(--muted);font-size:11px;">prefix </span><span style="color:var(--accent2);font-weight:500;">' + prefix + '</span>';
+      html += '<span style="color:var(--faint);margin:0 6px;">·</span>';
+      html += '<span style="color:var(--muted);font-size:11px;">suffix </span><span style="color:var(--accent2);font-weight:500;">' + suffix + '</span>';
+      html += '</span>';
+      html += '&nbsp;&nbsp;<a href="' + numpacBase + '" target="_blank" style="font-family:var(--mono);font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid var(--border2);color:var(--muted);text-decoration:none;display:inline-block;vertical-align:middle;">Öppna Numpac ↗</a>';
       html += '</td>';
     } else {
       html += '<td style="padding:10px 16px;border-bottom:' + border + ';color:var(--faint);font-size:12px;">Okänt prefix</td>';

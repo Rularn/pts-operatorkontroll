@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Numpac redirect</title>
+<script>
+  window.onload = function() {
+    const p = new URLSearchParams(window.location.search);
+    const prefix = p.get('prefix');
+    const suffix = p.get('suffix');
+    if (!prefix || !suffix) { document.body.innerHTML = 'Saknar parametrar'; return; }
+
+    // Bygg ett formulär och skicka det direkt
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = 'https://www.siirretytnumerot.fi/NumberQueryServlet';
+
+    [['clientLanguage','se'],['numberPrefix',prefix],['numberSuffix',suffix]].forEach(([k,v]) => {
+      const i = document.createElement('input');
+      i.type = 'hidden'; i.name = k; i.value = v;
+      form.appendChild(i);
+    });
+
+    document.body.appendChild(form);
+    form.submit();
+  }
+</script>
+</head>
+<body>Söker...</body>
+</html>
